@@ -1,0 +1,36 @@
+name: Publish Proton release
+run-name: Creating Proton release build
+on: [workflow_dispatch]
+jobs:
+  build-proton:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Proton
+        uses: actions/checkout@main
+        with:
+          repository: 'ValveSoftware/Proton'
+          ref: 'experimental_7.0'
+          submodules: 'recursive'
+      - name: Apply patches
+        working-directory: ./wine
+        run: |
+          wget -q -O - https://github.com/UrbanSombrero/wine/commit/90160efd829f84def0f5a21bcb253bb278bfe84d.patch | git apply -v
+      - name: Get current date
+        id: date
+        run: echo "current_date=$(date +'%Y%m%d')" >> $GITHUB_OUTPUT
+      - name: Install FontForge
+        run: sudo apt-get install -y fontforge-nox
+      - name: Build Proton
+        run: make redist build_name="Proton_Experimental_${{ steps.date.outputs.current_date }}"
+      - name: Create archive
+        working-directory: ./build
+        run: tar cJf ../proton-${{ steps.date.outputs.current_date }}.tar.xz "Proton_Experimental_${{ steps.date.outputs.current_date }}"
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: |
+            Latest Proton Experimental 7.0 with fix for GNOME 43
+            Extract to `~/.steam/root/compatibilitytools.d`
+          files: proton-${{ steps.date.outputs.current_date }}.tar.xz
+          tag_name: ${{ steps.date.outputs.current_date }}
+          name: Proton ${{ steps.date.outputs.current_date }}
